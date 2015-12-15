@@ -3,12 +3,16 @@ package com.liran.imagerloader.Utils;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.os.Environment;
+import android.os.Looper;
 import android.util.LruCache;
 
 import com.liran.imagerloader.Disklrucache.DiskLruCache;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.OutputStream;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 
 /**
  * ImageLoader主类
@@ -20,6 +24,7 @@ public class ImageLoader {
      * 缓存大小
      */
     public static final int DISK_CACHE_SIZE = 1024 * 1024 * 50;
+    private static final int DISK_CACHE_INDEX = 0;
 
     private boolean mIsDiskLruCacheCareated;
 
@@ -65,8 +70,87 @@ public class ImageLoader {
      * @return
      */
     private int getUsabkleSpace(File diskCacheDir) {
+
         return 0;
     }
+
+    private Bitmap loadBitmapFromHttp(String url, int reqWidth, int reqHeight) throws IOException {
+        //判断当前是够在UI线程
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            throw new RuntimeException("不能在UI线程进行网络操作");
+        }
+
+        if (mDiskLruCache == null) {
+            return null;
+        }
+
+        String key = hashKeyFromUrl(url);
+
+        DiskLruCache.Editor editor=mDiskLruCache.edit(key);
+
+        if(editor!=null){
+            OutputStream outputStream=editor.newOutputStream(DISK_CACHE_INDEX);
+//            if()
+
+        }
+
+        return loadBitmapFromDiskLruCache(url,reqWidth,reqHeight);
+    }
+
+    /**
+     * 从FromDiskLruCache获取bitmap
+     * @param url
+     * @param reqWidth
+     * @param reqHeight
+     * @return
+     */
+    private Bitmap loadBitmapFromDiskLruCache(String url, int reqWidth, int reqHeight) {
+
+        //判断当前是够在UI线程
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            throw new RuntimeException("不能在UI线程进行网络操作");
+        }
+
+        if (mDiskLruCache == null) {
+            return null;
+        }
+
+
+
+        return null;
+    }
+
+
+    /**
+     * 通过url获取key
+     *
+     * @param url
+     * @return
+     */
+    private String hashKeyFromUrl(String url) {
+        String cacheKey = null;
+        try {
+            final MessageDigest messageDigest = MessageDigest.getInstance("MD5");
+            messageDigest.update(url.getBytes());
+            cacheKey = bytesToHexString(messageDigest.digest());
+        } catch (NoSuchAlgorithmException e) {
+            cacheKey = String.valueOf(url.hashCode());
+        }
+        return cacheKey;
+    }
+
+    private String bytesToHexString(byte[] bytes) {
+        StringBuilder sb=new StringBuilder();
+        for (int i = 0; i < bytes.length; i++) {
+            String hex=Integer.toHexString(0xFF&bytes[i]);
+            if(hex.length()==1){
+                sb.append('0');
+            }
+            sb.append(hex);
+        }
+        return sb.toString();
+    }
+
 
     /**
      * 获取缓存路径
