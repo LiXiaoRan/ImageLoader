@@ -13,6 +13,12 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.concurrent.Executor;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * ImageLoader主类
@@ -20,17 +26,44 @@ import java.security.NoSuchAlgorithmException;
  */
 public class ImageLoader {
 
+
+    public static final String TAG = "ImageLoader";
+
+    public static final int MESSAGE_POST_REQUEST = 1;
+
+    public static final int CPU_COUNT = Runtime.getRuntime().availableProcessors();
+    public static final int CORE_POOL_SIZE = CPU_COUNT + 1;
+    public static final int MAXIMUM_POOL_SIZE = CPU_COUNT * 2 + 1;
+    public static final long KEEP_ALIVE = 10L;
+
+//    public static final int TAG_KEY_URI= R.id.im
+
+
     /**
      * 缓存大小
      */
-    public static final int DISK_CACHE_SIZE = 1024 * 1024 * 50;
+    private static final long DISK_CACHE_SIZE = 1024 * 1024 * 50;
     private static final int DISK_CACHE_INDEX = 0;
+    private static final int IO_BUFFER_SIZE = 8 * 1024 * 1024;
 
     private boolean mIsDiskLruCacheCareated;
 
     private LruCache<String, Bitmap> mMemoryCache;
     private DiskLruCache mDiskLruCache;
 
+
+    public static final ThreadFactory mThreadFactory = new ThreadFactory() {
+        private final AtomicInteger mCount = new AtomicInteger(1);
+
+        @Override
+        public Thread newThread(Runnable r) {
+            //以原子方式将当前值加 1。
+            return new Thread(r, "ImageLoader# " + mCount.getAndIncrement());
+        }
+    };
+
+    public static final Executor THREAD_POOL_EXECUTOR = new ThreadPoolExecutor(CORE_POOL_SIZE,
+            MAXIMUM_POOL_SIZE, KEEP_ALIVE, TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>(), mThreadFactory);
 
     private Context mContext;
 
@@ -63,6 +96,11 @@ public class ImageLoader {
 
     }
 
+
+    public static ImageLoader build(Context context) {
+        return new ImageLoader(context);
+    }
+
     /**
      * 获取此路径空间大小
      *
@@ -86,19 +124,20 @@ public class ImageLoader {
 
         String key = hashKeyFromUrl(url);
 
-        DiskLruCache.Editor editor=mDiskLruCache.edit(key);
+        DiskLruCache.Editor editor = mDiskLruCache.edit(key);
 
-        if(editor!=null){
-            OutputStream outputStream=editor.newOutputStream(DISK_CACHE_INDEX);
+        if (editor != null) {
+            OutputStream outputStream = editor.newOutputStream(DISK_CACHE_INDEX);
 //            if()
 
         }
 
-        return loadBitmapFromDiskLruCache(url,reqWidth,reqHeight);
+        return loadBitmapFromDiskLruCache(url, reqWidth, reqHeight);
     }
 
     /**
      * 从FromDiskLruCache获取bitmap
+     *
      * @param url
      * @param reqWidth
      * @param reqHeight
@@ -114,7 +153,6 @@ public class ImageLoader {
         if (mDiskLruCache == null) {
             return null;
         }
-
 
 
         return null;
@@ -140,10 +178,10 @@ public class ImageLoader {
     }
 
     private String bytesToHexString(byte[] bytes) {
-        StringBuilder sb=new StringBuilder();
+        StringBuilder sb = new StringBuilder();
         for (int i = 0; i < bytes.length; i++) {
-            String hex=Integer.toHexString(0xFF&bytes[i]);
-            if(hex.length()==1){
+            String hex = Integer.toHexString(0xFF & bytes[i]);
+            if (hex.length() == 1) {
                 sb.append('0');
             }
             sb.append(hex);
